@@ -1,0 +1,59 @@
+id = "herdr.tree"
+name = "Tree"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "A live workspace, tab, agent, and Git tree in Herdr's native sidebar"
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["cargo", "build", "--release", "--locked"]
+
+[[startup]]
+command = ["target/release/herdr-tree", "daemon", "start"]
+
+[[actions]]
+id = "configure"
+title = "Tree: configure sidebar"
+description = "Back up Herdr config, install the managed tree rows and theme, then reload."
+command = ["target/release/herdr-tree", "configure"]
+
+[[actions]]
+id = "unconfigure"
+title = "Tree: remove sidebar configuration"
+description = "Stop the daemon and remove only herdr-tree's managed config blocks."
+command = ["target/release/herdr-tree", "unconfigure"]
+
+[[actions]]
+id = "refresh"
+title = "Tree: refresh now"
+contexts = ["workspace", "tab", "pane"]
+command = ["target/release/herdr-tree", "refresh"]
+
+[[actions]]
+id = "toggle-collapse"
+title = "Tree: collapse/expand workspace"
+contexts = ["workspace", "tab", "pane"]
+command = ["target/release/herdr-tree", "toggle-collapse"]
+
+[[actions]]
+id = "expand-all"
+title = "Tree: expand all workspaces"
+contexts = ["workspace", "tab", "pane"]
+command = ["target/release/herdr-tree", "expand-all"]
+
+[[actions]]
+id = "collapse-all"
+title = "Tree: collapse all workspaces"
+contexts = ["workspace", "tab", "pane"]
+command = ["target/release/herdr-tree", "collapse-all"]
+
+[[actions]]
+id = "doctor"
+title = "Tree: diagnose projection"
+contexts = ["workspace", "tab", "pane"]
+command = ["target/release/herdr-tree", "doctor"]
+
+[[events]]
+on = "pane.agent_detected"
+command = ["target/release/herdr-tree", "daemon", "start"]
+

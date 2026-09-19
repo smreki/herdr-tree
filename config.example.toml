@@ -1,0 +1,33 @@
+layout = "detailed"
+max_tabs = 7
+show_pane_count = "multiple"
+workspace_tab_count = "collapsed"
+git_detail = "compact"
+git_refresh_interval_seconds = 2
+git_background_refresh_interval_seconds = 5
+git_command_timeout_seconds = 3
+spinner_interval_ms = 150
+done_hold = "until_seen"
+done_hold_seconds = 6
+blocked_hold = true
+idle_grace_seconds = 0.5
+
+[glyphs]
+done = "✓"
+blocked = "!"
+blocked_quiet = "·"
+idle = "◉"
+no_agent = "○"
+unknown = "◌"
+working = ["⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽", "⣾"]
+
+[colors]
+active_tab = "#89b4fa"
+normal_tab = "#cdd6f4"
+detail = "#a6adc8"
+done = "#a6e3a1"
+blocked = "#f38ba8"
+idle = "#a6adc8"
+unknown = "#cba6f7"
+active_workspace_bg = "#313244"
+selection_bg = "#45475a"
