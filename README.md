@@ -35,6 +35,9 @@ The active native workspace uses Herdr's `active_row_bg`. The active synthetic
 tab uses bold text and the configured accent foreground. Explicit Herdr
 workspace and tab renames become persistent manual display names. Collapse,
 manual-name ownership, and held lifecycle states survive daemon restarts.
+Each named Herdr session has its own daemon and control socket, so attaching
+with `herdr session attach <name>` also renders that session's workspace names
+and keeps refresh, collapse, and stop actions local to that session.
 For an automatic workspace name, the first observed directory basename is
 captured once; changing a pane's cwd later does not rename the workspace root.
 
@@ -118,6 +121,11 @@ plugin command failures with:
 ```bash
 herdr plugin log list --plugin herdr.tree
 ```
+
+When upgrading from the shared-daemon version, stop the old daemon with the
+old binary's `daemon stop` command before rebuilding, then invoke the refresh
+action in each already running session. Newly started sessions start their own
+daemon automatically.
 
 ## Configuration
 

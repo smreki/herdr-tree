@@ -1,7 +1,9 @@
 use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
     io::{Read, Write},
     os::unix::net::{UnixListener, UnixStream},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -67,8 +69,15 @@ pub fn poll(listener: &UnixListener) -> Result<Option<ControlCommand>> {
     }
 }
 
-pub fn start_background(state_dir: &Path) -> Result<()> {
-    let socket = state_dir.join("daemon.sock");
+#[must_use]
+pub fn socket_path(state_dir: &Path, herdr_socket: &Path) -> PathBuf {
+    let mut hasher = DefaultHasher::new();
+    herdr_socket.hash(&mut hasher);
+    state_dir.join(format!("daemon-{:016x}.sock", hasher.finish()))
+}
+
+pub fn start_background(state_dir: &Path, herdr_socket: &Path) -> Result<()> {
+    let socket = socket_path(state_dir, herdr_socket);
     if notify(&socket, ControlCommand::Wake).is_ok() {
         return Ok(());
     }
@@ -83,4 +92,52 @@ pub fn start_background(state_dir: &Path) -> Result<()> {
         .spawn()
         .context("failed to launch herdr-tree daemon")?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_controls_are_isolated_in_a_shared_plugin_state_directory() {
+        let directory = tempfile::tempdir().expect("temporary plugin state directory");
+        let default_path = socket_path(directory.path(), Path::new("/herdr/herdr.sock"));
+        let named_path = socket_path(
+            directory.path(),
+            Path::new("/herdr/sessions/new/herdr.sock"),
+        );
+        let default = bind(&default_path).expect("bind default session control");
+        let named = bind(&named_path).expect("bind named session control");
+
+        notify(&named_path, ControlCommand::Stop).expect("stop named session");
+        assert_eq!(poll(&default).expect("poll default session"), None);
+        assert_eq!(
+            poll(&named).expect("poll named session"),
+            Some(ControlCommand::Stop)
+        );
+
+        notify(&default_path, ControlCommand::Refresh).expect("refresh default session");
+        assert_eq!(poll(&named).expect("poll named session"), None);
+        assert_eq!(
+            poll(&default).expect("poll default session"),
+            Some(ControlCommand::Refresh)
+        );
+    }
+
+    #[test]
+    fn starting_a_session_does_not_mistake_another_sessions_daemon_for_its_own() {
+        let directory = tempfile::tempdir().expect("temporary plugin state directory");
+        let herdr_socket = Path::new("/herdr/sessions/new/herdr.sock");
+        let path = socket_path(directory.path(), herdr_socket);
+        let _listener = bind(&path).expect("bind session control");
+
+        assert!(
+            notify(
+                &socket_path(directory.path(), Path::new("/herdr/herdr.sock")),
+                ControlCommand::Wake
+            )
+            .is_err()
+        );
+        assert_eq!(path, socket_path(directory.path(), herdr_socket));
+    }
 }

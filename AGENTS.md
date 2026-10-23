@@ -34,6 +34,8 @@ data at snapshot, cache, persistence, and outbound metadata boundaries. Avoid
 - The service loop owns mutable runtime state. Worker threads may deliver
   messages, but they must not independently mutate the current tree or token
   cache.
+- Scope daemon control sockets by the Herdr socket path. Named sessions share
+  the plugin state directory but require independent daemons and controls.
 - Animation may only re-render cached state. A 150 ms spinner or blocked pulse
   must never trigger a snapshot, Git process, state write, or config reload.
 - Keep workspace metadata patches at 16 tokens or fewer and every configured

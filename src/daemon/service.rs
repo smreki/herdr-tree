@@ -130,7 +130,7 @@ impl Service {
 
     pub fn run(mut self, state_dir: &Path) -> Result<()> {
         std::fs::create_dir_all(state_dir)?;
-        let control_path = state_dir.join("daemon.sock");
+        let control_path = control::socket_path(state_dir, self.client.socket_path());
         let listener = control::bind(&control_path)?;
         let (event_tx, event_rx) = mpsc::channel();
         let event_socket = self.client.socket_path().to_path_buf();

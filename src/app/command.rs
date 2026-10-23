@@ -5,7 +5,9 @@ use clap::{Parser, Subcommand};
 
 use crate::{
     config,
-    daemon::{ControlCommand, Service, ServiceState, notify, start_background},
+    daemon::{
+        ControlCommand, Service, ServiceState, control_socket_path, notify, start_background,
+    },
     herdr::{HerdrClient, chunks},
     project::{LifecycleTracker, project_snapshot},
     render::{RenderClock, empty_workspace_tokens, render_workspace},
@@ -64,14 +66,14 @@ pub fn run(cli: Cli) -> Result<()> {
     let config = config::load_or_seed(&config_dir)?;
     seed_shell_runtime_paths(&config_dir, &state_dir)?;
     let socket = socket_path()?;
-    let control = state_dir.join("daemon.sock");
+    let control = control_socket_path(&state_dir, &socket);
     let session_key = socket.display().to_string();
     let store = StateStore::new(&state_dir);
 
     match command {
         CommandKind::Daemon {
             command: DaemonCommand::Start,
-        } => start_background(&state_dir),
+        } => start_background(&state_dir, &socket),
         CommandKind::Daemon {
             command: DaemonCommand::Stop,
         } => notify(&control, ControlCommand::Stop),
@@ -112,12 +114,12 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         CommandKind::Refresh => {
             if notify(&control, ControlCommand::Refresh).is_err() {
-                start_background(&state_dir)?;
+                start_background(&state_dir, &socket)?;
             }
             Ok(())
         }
         CommandKind::ToggleCollapse => {
-            let client = HerdrClient::new(socket);
+            let client = HerdrClient::new(socket.clone());
             let snapshot = client.snapshot()?;
             let workspace_id = std::env::var("HERDR_WORKSPACE_ID")
                 .ok()
@@ -133,7 +135,7 @@ pub fn run(cli: Cli) -> Result<()> {
                     collapsed.insert(workspace_id);
                 }
             })?;
-            restart_for_state_change(&control, &state_dir)
+            restart_for_state_change(&control, &state_dir, &socket)
         }
         CommandKind::ExpandAll => {
             store.update(|state| {
@@ -144,10 +146,10 @@ pub fn run(cli: Cli) -> Result<()> {
                     .collapsed_workspaces
                     .clear();
             })?;
-            restart_for_state_change(&control, &state_dir)
+            restart_for_state_change(&control, &state_dir, &socket)
         }
         CommandKind::CollapseAll => {
-            let snapshot = HerdrClient::new(socket).snapshot()?;
+            let snapshot = HerdrClient::new(socket.clone()).snapshot()?;
             store.update(|state| {
                 let collapsed = &mut state
                     .sessions
@@ -161,7 +163,7 @@ pub fn run(cli: Cli) -> Result<()> {
                         .map(|workspace| workspace.workspace_id),
                 );
             })?;
-            restart_for_state_change(&control, &state_dir)
+            restart_for_state_change(&control, &state_dir, &socket)
         }
         CommandKind::Configure => {
             let path = herdr_config_path()?;
@@ -256,7 +258,11 @@ fn collapsed_set(store: &StateStore, session_key: &str) -> Result<BTreeSet<Strin
         .unwrap_or_default())
 }
 
-fn restart_for_state_change(control: &std::path::Path, state_dir: &std::path::Path) -> Result<()> {
+fn restart_for_state_change(
+    control: &std::path::Path,
+    state_dir: &std::path::Path,
+    herdr_socket: &std::path::Path,
+) -> Result<()> {
     let _ = notify(control, ControlCommand::Stop);
     for _ in 0..20 {
         if std::os::unix::net::UnixStream::connect(control).is_err() {
@@ -264,7 +270,7 @@ fn restart_for_state_change(control: &std::path::Path, state_dir: &std::path::Pa
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-    start_background(state_dir)
+    start_background(state_dir, herdr_socket)
 }
 
 fn reload_herdr() -> Result<()> {
